@@ -61,8 +61,8 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case "dash":      return <PageDash       {...allData} onNav={nav}/>
-      case "clientes":  return <PageClientes   clientes={clientes} setClientes={setClientes}/>
-      case "ingresos":  return <PageIngresos   ingresos={ingresos} setIngresos={setIngresos} clientes={clientes}/>
+      case "clientes":  return <PageClientes   clientes={clientes} setClientes={setClientes} setIngresos={setIngresos}/>
+      case "ingresos":  return <PageIngresos   ingresos={ingresos} setIngresos={setIngresos} clientes={clientes} setClientes={setClientes}/>
       case "gastos":    return <PageGastos     gastos_fijos={gastos_fijos} setGastosFijos={setGastosFijos} gastos_var={gastos_var} setGastosVar={setGastosVar}/>
       case "horarios":  return <PageHorarios   horarios={horarios} setHorarios={setHorarios} config={config}/>
       case "asist":     return <PageAsist      asistencias={asistencias} setAsistencias={setAsistencias} clientes={clientes}/>
