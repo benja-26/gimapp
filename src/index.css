@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #0c0e13;
+  color: #eef0f8;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, select, textarea {
+  color: #eef0f8 !important;
+  font-family: 'DM Sans', sans-serif;
+}
+
+input::placeholder {
+  color: #3e4658 !important;
+}
+
+input[type=date]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(.4);
+}
+
+select option {
+  background: #181c25;
+  color: #eef0f8;
+}
+
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+::-webkit-scrollbar-thumb {
+  background: #252d3d;
+  border-radius: 2px;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(50px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
