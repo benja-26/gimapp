@@ -25,7 +25,7 @@ const NAV = [
   { id:"dash",      ico:"📊", lbl:"Inicio"   },
   { id:"clientes",  ico:"👥", lbl:"Clientes" },
   { id:"ingresos",  ico:"💰", lbl:"Caja"     },
-  { id:"kpis",      ico:"📈", lbl:"KPIs"     },
+  { id:"gastos",    ico:"💸", lbl:"Gastos"   },
   { id:"mas",       ico:"☰",  lbl:"Más"      },
 ]
 
