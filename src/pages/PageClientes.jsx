@@ -16,12 +16,31 @@ export default function PageClientes({ clientes, setClientes }) {
   const [form,   setFormRaw]= useState({})
   const set = (k, v) => setFormRaw(f => ({...f, [k]: v}))
 
+  // Obtener la fecha de hoy en formato AAAA-MM-DD para Salta
+  const getHoyStr = () => new Date().toLocaleDateString("sv-SE")
+
   const openNew = () => {
     setEditing(null)
-    setFormRaw({ estado:"Activo", actividad:"Musculación", plan:"Mensual", pago:"Efectivo", referido:"Instagram", deuda:0 })
+    setFormRaw({ 
+      estado: "Activo", 
+      actividad: "Musculación", 
+      plan: "Mensual", 
+      pago: "Efectivo", 
+      referido: "Instagram", 
+      deuda: 0,
+      alta: getHoyStr() // Por defecto arranca con el día de hoy
+    })
     setModal(true)
   }
-  const openEdit = c => { setEditing(c.id); setFormRaw({...c}); setModal(true) }
+  
+  const openEdit = c => { 
+    setEditing(c.id)
+    setFormRaw({
+      ...c,
+      alta: c.alta || getHoyStr() // Si los viejos no tenían, les pone hoy
+    })
+    setModal(true) 
+  }
 
   const save = () => {
     if (!form.nombre?.trim()) { toast("⚠️ Ingresá el nombre"); return }
@@ -29,7 +48,7 @@ export default function PageClientes({ clientes, setClientes }) {
       setClientes(l => l.map(c => c.id === editing ? {...c, ...form, precio:+form.precio||0, deuda:+form.deuda||0} : c))
       toast("✅ Cliente actualizado")
     } else {
-      setClientes(l => [...l, {...form, id:uid(), alta:new Date().toISOString().split("T")[0], precio:+form.precio||0, deuda:+form.deuda||0}])
+      setClientes(l => [...l, {...form, id:uid(), precio:+form.precio||0, deuda:+form.deuda||0}])
       toast("✅ Cliente agregado")
     }
     setModal(false)
@@ -57,6 +76,9 @@ export default function PageClientes({ clientes, setClientes }) {
       {list.map((c, i) => {
         const col = COLORS[i % COLORS.length]
         const ini = initials(c.nombre)
+        // Formatear un poco la visual de la fecha (de AAAA-MM-DD a DD/MM/AAAA)
+        const fechaFormateada = c.alta ? c.alta.split("-").reverse().join("/") : ""
+
         return (
           <div key={c.id} style={{background:"#1c2130",border:"1px solid #252d3d",borderRadius:14,padding:"12px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:12}}>
             <div onClick={() => openEdit(c)} style={{flex:1,display:"flex",alignItems:"center",gap:12,cursor:"pointer",minWidth:0}}>
@@ -65,6 +87,7 @@ export default function PageClientes({ clientes, setClientes }) {
                 <div style={{fontSize:14,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.nombre}</div>
                 <div style={{fontSize:11,color:"#8891a8",marginTop:2}}>
                   {c.plan} · ${fmt(c.precio)}/mes · {c.actividad}
+                  {fechaFormateada && <span style={{color:"#4cd137"}}> · Alta: {fechaFormateada}</span>}
                   {(c.deuda||0) < 0 && <span style={{color:"#ff4444"}}> · ⚠ deuda</span>}
                 </div>
               </div>
@@ -80,6 +103,7 @@ export default function PageClientes({ clientes, setClientes }) {
           <Field label="Nombre completo" full><Input placeholder="Nombre y apellido" value={form.nombre||""} onChange={e=>set("nombre",e.target.value)}/></Field>
           <Field label="Edad"><Input type="number" placeholder="25" value={form.edad||""} onChange={e=>set("edad",e.target.value)}/></Field>
           <Field label="Sexo"><Select value={form.sexo||"M"} onChange={e=>set("sexo",e.target.value)}><option>M</option><option>F</option><option>Otro</option></Select></Field>
+          <Field label="Fecha de Alta"><Input type="date" value={form.alta||""} onChange={e=>set("alta",e.target.value)}/></Field>
           <Field label="Actividad"><Select value={form.actividad||"Musculación"} onChange={e=>set("actividad",e.target.value)}><option>Musculación</option><option>Funcional</option><option>Yoga</option><option>Crossfit</option></Select></Field>
           <Field label="Plan"><Select value={form.plan||"Mensual"} onChange={e=>set("plan",e.target.value)}><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></Select></Field>
           <Field label="Precio $"><Input type="number" placeholder="18000" value={form.precio||""} onChange={e=>set("precio",e.target.value)}/></Field>
