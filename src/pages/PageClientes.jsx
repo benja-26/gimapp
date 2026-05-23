@@ -9,7 +9,7 @@ const TABS = [
   {v:"inactivo",l:"Inactivos"},{v:"deuda",l:"Con deuda"},
 ]
 
-export default function PageClientes({ clientes, setClientes, setIngresos }) {
+export default function PageClientes({ clientes, setClientes, setIngresos, planes }) {
   const [tab,    setTab]    = useState("todos")
   const [modal,  setModal]  = useState(false)
   const [editing,setEditing]= useState(null)
@@ -18,7 +18,6 @@ export default function PageClientes({ clientes, setClientes, setIngresos }) {
 
   const getHoyStr = () => new Date().toLocaleDateString("sv-SE")
 
-  // Función matemática para sumarle exactamente 30 días a una fecha
   const calcularVencimiento = (fechaAlta) => {
     if (!fechaAlta) return ""
     const fecha = new Date(fechaAlta + "T00:00:00")
@@ -26,16 +25,32 @@ export default function PageClientes({ clientes, setClientes, setIngresos }) {
     return fecha.toLocaleDateString("sv-SE")
   }
 
+  // Filtrar solo los planes que configuraste como activos
+  const planesActivos = planes ? planes.filter(p => p.activo !== false) : []
+
+  // Manejar el cambio de plan para sugerir el precio de forma automática
+  const handlePlanChange = (planNombre) => {
+    set("plan", planNombre)
+    const planSeleccionado = planesActivos.find(p => p.nombre === planNombre)
+    if (planSeleccionado) {
+      // Por defecto al dar de alta sugiere el precio intermedio "Al Día" (p2)
+      set("precio", planSeleccionado.p2)
+    }
+  }
+
   const openNew = () => {
     setEditing(null)
+    const primerPlan = planesActivos[0]?.nombre || "Pack 12 (3x)"
+    const primerPrecio = planesActivos[0]?.p2 || 38000
+
     setFormRaw({ 
       estado: "Activo", 
-      actividad: "Crossfit", // Por defecto SKOL es puro Crossfit
-      plan: "Pack 12 (3x)", 
+      actividad: "Crossfit", 
+      plan: primerPlan, 
       pago: "Efectivo", 
       referido: "Instagram", 
       deuda: 0,
-      precio: 38000, // Precio base inicial sugerido
+      precio: primerPrecio, 
       alta: getHoyStr()
     })
     setModal(true)
@@ -50,28 +65,23 @@ export default function PageClientes({ clientes, setClientes, setIngresos }) {
   const save = () => {
     if (!form.nombre?.trim()) { toast("⚠️ Ingresá el nombre"); return }
     
-    // Calcular el vencimiento automático en base a la fecha de alta elegida
     const fechaVto = calcularVencimiento(form.alta)
 
     if (editing) {
-      // EDICIÓN: Solo actualiza la ficha del cliente (el Stock), no altera la caja vieja
       setClientes(l => l.map(c => c.id === editing ? {...c, ...form, vencimiento: fechaVto, precio:+form.precio||0, deuda:+form.deuda||0} : c))
       toast("✅ Cliente actualizado")
     } else {
-      // NUEVO CLIENTE: Genera el Stock y dispara el Flujo de Caja simultáneamente
       const nuevoId = uid()
       const montoCobrado = +form.precio || 0
 
-      // 1. Guardar datos del cliente con su fecha de vencimiento calculada
       setClientes(l => [...l, {
         ...form, 
         id: nuevoId, 
         vencimiento: fechaVto, 
         precio: montoCobrado, 
-        deuda: 0 // Arranca en cero porque ya te pagó en la mano
+        deuda: 0 
       }])
 
-      // 2. Inyectar automáticamente el cobro en el Flujo de Caja (Ingresos)
       if (montoCobrado > 0 && setIngresos) {
         setIngresos(ing => [
           ...ing, 
@@ -80,7 +90,7 @@ export default function PageClientes({ clientes, setClientes, setIngresos }) {
             clienteId: nuevoId,
             concepto: `Alta Socio: ${form.nombre} (${form.plan})`,
             monto: montoCobrado,
-            fecha: form.alta, // Se registra con la misma fecha en que ingresó
+            fecha: form.alta, 
             pago: form.pago
           }
         ])
@@ -141,15 +151,17 @@ export default function PageClientes({ clientes, setClientes, setIngresos }) {
           <Field label="Sexo"><Select value={form.sexo||"M"} onChange={e=>set("sexo",e.target.value)}><option>M</option><option>F</option><option>Otro</option></Select></Field>
           <Field label="Fecha de Alta"><Input type="date" value={form.alta||""} onChange={e=>set("alta",e.target.value)}/></Field>
           
-          <Field label="Plan/Pack"><Select value={form.plan||"Pack 12 (3x)"} onChange={e=>set("plan",e.target.value)}>
-            <option>Pack 8 (2x)</option>
-            <option>Pack 12 (3x)</option>
-            <option>Pack 20 (5x)</option>
-            <option>Promo Grupo (3+)</option>
-            <option>Promo Adolescente (3x)</option>
-            <option>Promo Adolescente (5x)</option>
-            <option>Clase Suelta</option>
-          </Select></Field>
+          <Field label="Plan/Pack">
+            <Select value={form.plan || ""} onChange={e => handlePlanChange(e.target.value)}>
+              {planesActivos.length === 0 ? (
+                <option>Carga packs en Configuración</option>
+              ) : (
+                planesActivos.map(p => (
+                  <option key={p.id} value={p.nombre}>{p.nombre}</option>
+                ))
+              )}
+            </Select>
+          </Field>
 
           <Field label="Monto Cobrado $"><Input type="number" placeholder="38000" value={form.precio||""} onChange={e=>set("precio",e.target.value)}/></Field>
           <Field label="Medio de pago"><Select value={form.pago||"Efectivo"} onChange={e=>set("pago",e.target.value)}><option>Efectivo</option><option>Transferencia</option><option>Débito</option><option>Tarjeta</option><option>MercadoPago</option></Select></Field>
