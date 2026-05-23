@@ -5,21 +5,21 @@ import { exportExcel } from "./utils/exportExcel.js"
 import { KEYS, DEFAULT_CONFIG, DEFAULT_PROY, HORARIOS_INIT } from "./data/defaults.js"
 
 // Pages
-import PageDash       from "./pages/PageDash.jsx"
-import PageClientes   from "./pages/PageClientes.jsx"
-import PageIngresos   from "./pages/PageIngresos.jsx"
-import PageGastos     from "./pages/PageGastos.jsx"
-import PageAsist      from "./pages/PageAsist.jsx"
-import PageHorarios   from "./pages/PageHorarios.jsx"
+import PageDash        from "./pages/PageDash.jsx"
+import PageClientes    from "./pages/PageClientes.jsx"
+import PageIngresos    from "./pages/PageIngresos.jsx"
+import PageGastos      from "./pages/PageGastos.jsx"
+import PageAsist       from "./pages/PageAsist.jsx"
+import PageHorarios    from "./pages/PageHorarios.jsx"
 import PageInventario from "./pages/PageInventario.jsx"
-import PageRRHH       from "./pages/PageRRHH.jsx"
-import PageKPIs       from "./pages/PageKPIs.jsx"
-import PageProy       from "./pages/PageProy.jsx"
-import PageReub       from "./pages/PageReub.jsx"
-import PageExp        from "./pages/PageExp.jsx"
-import PageComp       from "./pages/PageComp.jsx"
-import PageConfig     from "./pages/PageConfig.jsx"
-import PageMas        from "./pages/PageMas.jsx"
+import PageRRHH        from "./pages/PageRRHH.jsx"
+import PageKPIs        from "./pages/PageKPIs.jsx"
+import PageProy        from "./pages/PageProy.jsx"
+import PageReub        from "./pages/PageReub.jsx"
+import PageExp         from "./pages/PageExp.jsx"
+import PageComp        from "./pages/PageComp.jsx"
+import PageConfig      from "./pages/PageConfig.jsx"
+import PageMas         from "./pages/PageMas.jsx"
 
 const NAV = [
   { id:"dash",      ico:"📊", lbl:"Inicio"   },
@@ -34,13 +34,24 @@ export default function App() {
   const [clientes,    setClientes]    = useStore(KEYS.clientes,     [])
   const [ingresos,    setIngresos]    = useStore(KEYS.ingresos,     [])
   const [gastos_fijos,setGastosFijos] = useStore(KEYS.gastos_fijos, [])
-  const [gastos_var,  setGastosVar]   = useStore(KEYS.gastos_var,   [])
+  const [gastos_var,  setGastosVar]   = useStore(KEYS.gastos_var,    [])
   const [inventario,  setInventario]  = useStore(KEYS.inventario,   [])
   const [rrhh,        setRRHH]        = useStore(KEYS.rrhh,         [])
   const [asistencias, setAsistencias] = useStore(KEYS.asistencias,  [])
   const [horarios,    setHorarios]    = useStore(KEYS.horarios,     HORARIOS_INIT)
   const [config,      setConfig]      = useStore(KEYS.config,       DEFAULT_CONFIG)
   const [proy,        setProy]        = useStore(KEYS.proy,         DEFAULT_PROY)
+  
+  
+ // Nuevo estado persistente para los Planes de SKOL con carga inicial automática
+  const [planes,      setPlanes]      = useStore("skol_planes", [
+    { id: "p8",  nombre: "Pack 8 (2x)",  clases: 8,  p1: 32000, p2: 35000, p3: 38000, activo: true },
+    { id: "p12", nombre: "Pack 12 (3x)", clases: 12, p1: 35000, p2: 38000, p3: 41000, activo: true },
+    { id: "p20", nombre: "Pack 20 (5x)", clases: 20, p1: 38000, p2: 41000, p3: 44000, activo: true },
+    { id: "pg",  nombre: "Promo Grupo (3+)", clases: 12, p1: 35000, p2: 35000, p3: 35000, activo: true },
+    { id: "pa3", nombre: "Promo Adolescente (3x)", clases: 12, p1: 30000, p2: 33000, p3: 36000, activo: true },
+    { id: "pa5", nombre: "Promo Adolescente (5x)", clases: 20, p1: 33000, p2: 36000, p3: 39000, activo: true }
+  ])
 
   // ── UI state ─────────────────────────────────────────────────────
   const [page,       setPage]       = useState("dash")
@@ -50,19 +61,19 @@ export default function App() {
     setSaveStatus("⏳ Guardando...")
     const t = setTimeout(() => setSaveStatus("✅ Guardado"), 600)
     return () => clearTimeout(t)
-  }, [clientes, ingresos, gastos_fijos, gastos_var, inventario, rrhh, asistencias, horarios, config, proy])
+  }, [clientes, ingresos, gastos_fijos, gastos_var, inventario, rrhh, asistencias, horarios, config, proy, planes])
 
   const nav = pg => setPage(pg)
 
   // ── All props bundled for pages that need them ──────────────────
-  const allData = { clientes, ingresos, gastos_fijos, gastos_var, inventario, rrhh, asistencias, horarios, config, proy }
-  const allSetters = { setClientes, setIngresos, setGastosFijos, setGastosVar, setInventario, setRRHH, setAsistencias, setHorarios, setConfig, setProy }
+  const allData = { clientes, ingresos, gastos_fijos, gastos_var, inventario, rrhh, asistencias, horarios, config, proy, planes }
+  const allSetters = { setClientes, setIngresos, setGastosFijos, setGastosVar, setInventario, setRRHH, setAsistencias, setHorarios, setConfig, setProy, setPlanes }
 
   const renderPage = () => {
     switch (page) {
       case "dash":      return <PageDash       {...allData} onNav={nav}/>
-      case "clientes":  return <PageClientes   clientes={clientes} setClientes={setClientes} setIngresos={setIngresos}/>
-      case "ingresos":  return <PageIngresos   ingresos={ingresos} setIngresos={setIngresos} clientes={clientes} setClientes={setClientes}/>
+      case "clientes":  return <PageClientes   clientes={clientes} setClientes={setClientes} setIngresos={setIngresos} planes={planes}/>
+      case "ingresos":  return <PageIngresos   ingresos={ingresos} setIngresos={setIngresos} clientes={clientes} setClientes={setClientes} planes={planes}/>
       case "gastos":    return <PageGastos     gastos_fijos={gastos_fijos} setGastosFijos={setGastosFijos} gastos_var={gastos_var} setGastosVar={setGastosVar}/>
       case "horarios":  return <PageHorarios   horarios={horarios} setHorarios={setHorarios} config={config}/>
       case "asist":     return <PageAsist      asistencias={asistencias} setAsistencias={setAsistencias} clientes={clientes}/>
@@ -73,7 +84,7 @@ export default function App() {
       case "reub":      return <PageReub       clientes={clientes} config={config} gastos_fijos={gastos_fijos}/>
       case "exp":       return <PageExp/>
       case "comp":      return <PageComp/>
-      case "cfg":       return <PageConfig     config={config} setConfig={setConfig}/>
+      case "cfg":       return <PageConfig     planes={planes} setPlanes={setPlanes}/>
       case "mas":       return <PageMas        onNav={nav}/>
       default:          return null
     }
