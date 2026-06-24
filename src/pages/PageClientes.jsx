@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Modal, Field, Input, Select, BtnRow, Badge, PageHeader, SubTitle, Empty, Tabs } from "../components/ui.jsx"
+import { Modal, Field, Input, Select, BtnRow, PageHeader, SubTitle, Empty, Tabs } from "../components/ui.jsx"
 import { fmt, uid, initials } from "../utils/helpers.js"
 import { toast } from "../hooks/useToast.js"
 import { COLORS } from "../data/defaults.js"
@@ -14,6 +14,10 @@ export default function PageClientes({ clientes, setClientes, setIngresos, plane
   const [modal,  setModal]  = useState(false)
   const [editing,setEditing]= useState(null)
   const [form,   setFormRaw]= useState({})
+  
+  // Interfaz Premium: Buscador rápido en la barra de clientes
+  const [filtroNombre, setFiltroNombre] = useState("")
+
   const set = (k, v) => setFormRaw(f => ({...f, [k]: v}))
 
   const getHoyStr = () => new Date().toLocaleDateString("sv-SE")
@@ -25,17 +29,47 @@ export default function PageClientes({ clientes, setClientes, setIngresos, plane
     return fecha.toLocaleDateString("sv-SE")
   }
 
-  // Filtrar solo los planes que configuraste como activos
+  // 🧠 FUNCIÓN SEMÁFORO: Analiza las fechas en tiempo real
+  const obtenerEstadoVencimiento = (vencimientoStr) => {
+    if (!vencimientoStr) return { color: "#8891a8", texto: "No fijado", bg: "#1c2130" }
+    
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+    
+    const vto = new Date(vencimientoStr + "T00:00:00")
+    vto.setHours(0, 0, 0, 0)
+
+    // Calcular diferencia en días corridos
+    const diffTiempo = vto.getTime() - hoy.getTime()
+    const diffDias = Math.ceil(diffTiempo / (1000 * 60 * 60 * 24))
+
+    if (diffDias < 0) {
+      return { 
+        color: "#ff4d4d", 
+        texto: `Vencido hace ${Math.abs(diffDias)} ${Math.abs(diffDias) === 1 ? 'día' : 'días'}`, 
+        bg: "rgba(255, 77, 77, 0.15)" 
+      }
+    } else if (diffDias <= 3) {
+      return { 
+        color: "#ff9f43", 
+        texto: diffDias === 0 ? "⚠️ Vence HOY" : `⏳ Vence en ${diffDias} ${diffDias === 1 ? 'día' : 'días'}`, 
+        bg: "rgba(255, 159, 67, 0.15)" 
+      }
+    } else {
+      return { 
+        color: "#4cd137", 
+        texto: `🟢 Al día (Vence ${vencimientoStr.split("-").reverse().join("/")})`, 
+        bg: "rgba(76, 209, 55, 0.12)" 
+      }
+    }
+  }
+
   const planesActivos = planes ? planes.filter(p => p.activo !== false) : []
 
-  // Manejar el cambio de plan para sugerir el precio de forma automática
   const handlePlanChange = (planNombre) => {
     set("plan", planNombre)
     const planSeleccionado = planesActivos.find(p => p.nombre === planNombre)
-    if (planSeleccionado) {
-      // Por defecto al dar de alta sugiere el precio intermedio "Al Día" (p2)
-      set("precio", planSeleccionado.p2)
-    }
+    if (planSeleccionado) set("precio", planSeleccionado.p2)
   }
 
   const openNew = () => {
@@ -64,7 +98,6 @@ export default function PageClientes({ clientes, setClientes, setIngresos, plane
 
   const save = () => {
     if (!form.nombre?.trim()) { toast("⚠️ Ingresá el nombre"); return }
-    
     const fechaVto = calcularVencimiento(form.alta)
 
     if (editing) {
@@ -74,28 +107,19 @@ export default function PageClientes({ clientes, setClientes, setIngresos, plane
       const nuevoId = uid()
       const montoCobrado = +form.precio || 0
 
-      setClientes(l => [...l, {
-        ...form, 
-        id: nuevoId, 
-        vencimiento: fechaVto, 
-        precio: montoCobrado, 
-        deuda: 0 
-      }])
+      setClientes(l => [...l, { ...form, id: nuevoId, vencimiento: fechaVto, precio: montoCobrado, deuda: 0 }])
 
       if (montoCobrado > 0 && setIngresos) {
-        setIngresos(ing => [
-          ...ing, 
-          {
-            id: uid(),
-            clienteId: nuevoId,
-            concepto: `Alta Socio: ${form.nombre} (${form.plan})`,
-            monto: montoCobrado,
-            fecha: form.alta, 
-            pago: form.pago
-          }
-        ])
+        setIngresos(ing => [...ing, {
+          id: uid(),
+          clienteId: nuevoId,
+          concepto: `Alta Socio: ${form.nombre} (${form.plan})`,
+          monto: montoCobrado,
+          fecha: form.alta, 
+          pago: form.pago
+        }])
       }
-      toast(`✅ Socio creado e ingreso de $${fmt(montoCobrado)} registrado en Caja`)
+      toast(`✅ Socio creado e ingreso de $${fmt(montoCobrado)} registrado`)
     }
     setModal(false)
   }
@@ -106,43 +130,83 @@ export default function PageClientes({ clientes, setClientes, setIngresos, plane
     toast("🗑️ Eliminado")
   }
 
+  // Filtrado combinado por Tab + Buscador predictivo superior
+  const list = clientes.filter(c => {
+    const cumpleFiltroText = c.nombre.toLowerCase().includes(filtroNombre.toLowerCase()) || c.plan.toLowerCase().includes(filtroNombre.toLowerCase())
+    if (!cumpleFiltroText) return false
+
+    if (tab === "activo") return c.estado === "Activo"
+    if (tab === "inactivo") return c.estado === "Inactivo"
+    if (tab === "deuda") return (c.deuda || 0) < 0
+    return true
+  })
+
   const actCount = clientes.filter(c => c.estado === "Activo").length
-  const list = tab === "activo"   ? clientes.filter(c => c.estado === "Activo")
-             : tab === "inactivo" ? clientes.filter(c => c.estado === "Inactivo")
-             : tab === "deuda"    ? clientes.filter(c => (c.deuda||0) < 0)
-             : clientes
 
   return (
     <div>
       <PageHeader title="Clientes" action="+ Nuevo" onAction={openNew}/>
       <SubTitle>{actCount} activos · {clientes.length} total</SubTitle>
+      
+      {/* 🔍 Interfaz Premium: Barra de búsqueda superior */}
+      <div style={{ marginBottom: 12 }}>
+        <Input 
+          placeholder="🔍 Buscar por nombre o pack..." 
+          value={filtroNombre} 
+          onChange={e => setFiltroNombre(e.target.value)} 
+          style={{ background: "#1c2130", borderColor: "#252d3d", borderRadius: 10 }}
+        />
+      </div>
+
       <Tabs options={TABS} value={tab} onChange={setTab}/>
 
-      {list.length === 0 && <Empty icon="👥" text="Sin clientes aquí"/>}
-      {list.map((c, i) => {
-        const col = COLORS[i % COLORS.length]
-        const ini = initials(c.nombre)
-        const vtoFormateado = c.vencimiento ? c.vencimiento.split("-").reverse().join("/") : "No fijado"
+      {list.length === 0 && <Empty icon="👥" text="Sin coincidencias de alumnos"/>}
+      
+      <div style={{ marginTop: 10 }}>
+        {list.map((c, i) => {
+          const col = COLORS[i % COLORS.length]
+          const ini = initials(c.nombre)
+          
+          // Calcular el estado del semáforo para este cliente específico
+          const semaforo = obtenerEstadoVencimiento(c.vencimiento)
 
-        return (
-          <div key={c.id} style={{background:"#1c2130",border:"1px solid #252d3d",borderRadius:14,padding:"12px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:12}}>
-            <div onClick={() => openEdit(c)} style={{flex:1,display:"flex",alignItems:"center",gap:12,cursor:"pointer",minWidth:0}}>
-              <div style={{width:40,height:40,borderRadius:"50%",background:col+"20",color:col,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne',sans-serif",fontSize:14,fontWeight:700,flexShrink:0}}>{ini}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:14,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.nombre}</div>
-                <div style={{fontSize:11,color:"#8891a8",marginTop:2}}>
-                  {c.plan} · {c.actividad}
-                  <div style={{marginTop:3, color:"#ff9f43", fontWeight: 500}}>
-                    ⏳ Vence: {vtoFormateado}
+          return (
+            <div key={c.id} style={{background:"#1c2130",border:"1px solid #252d3d",borderRadius:14,padding:"12px 13px",marginBottom:9,display:"flex",alignItems:"center",gap:12}}>
+              <div onClick={() => openEdit(c)} style={{flex:1,display:"flex",alignItems:"center",gap:12,cursor:"pointer",minWidth:0}}>
+                <div style={{width:40,height:40,borderRadius:"50%",background:col+"20",color:col,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne',sans-serif",fontSize:14,fontWeight:700,flexShrink:0}}>{ini}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",color:"#ffffff"}}>{c.nombre}</div>
+                  <div style={{fontSize:11,color:"#8891a8",marginTop:2}}>
+                    {c.plan} · {c.actividad}
+                  </div>
+                  {/* Etiqueta Premium con el Semáforo */}
+                  <div style={{
+                    display: "inline-block",
+                    marginTop: 6,
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: semaforo.color,
+                    background: semaforo.bg,
+                    border: `1px solid ${semaforo.color}30`
+                  }}>
+                    {semaforo.texto}
                   </div>
                 </div>
               </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "end", gap: 10 }}>
+                <button onClick={() => del(c.id)} style={{background:"none",border:"none",color:"#3e4658",cursor:"pointer",fontSize:14,padding:"0 4px"}}>✕</button>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 10, color: c.estado === "Activo" ? "#4cd137" : "#8891a8" }}>{c.estado}</span>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: c.estado === "Activo" ? "#4cd137" : "#8891a8" }} />
+                </div>
+              </div>
             </div>
-            <Badge active={c.estado === "Activo"}/>
-            <button onClick={() => del(c.id)} style={{background:"none",border:"none",color:"#3e4658",cursor:"pointer",fontSize:15,padding:"0 4px"}}>✕</button>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       <Modal open={modal} onClose={() => setModal(false)} title={editing ? "Editar cliente" : "Nuevo cliente"}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
