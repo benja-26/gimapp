@@ -127,7 +127,8 @@ export default function PageIngresos({ ingresos = [], setIngresos, clientes = []
               ...c,
               estado: "Activo",
               precio: montoNum,
-              vencimiento: nuevaFecha.toLocaleDateString("sv-SE")
+              vencimiento: nuevaFecha.toLocaleDateString("sv-SE"),
+              clasesUsadas: 0 // 🔄 Resetea el contador de asistencias para el nuevo mes
             }
           }
           return c

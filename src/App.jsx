@@ -76,7 +76,7 @@ export default function App() {
       case "ingresos":  return <PageIngresos   ingresos={ingresos} setIngresos={setIngresos} clientes={clientes} setClientes={setClientes} planes={planes}/>
       case "gastos":    return <PageGastos     gastos_fijos={gastos_fijos} setGastosFijos={setGastosFijos} gastos_var={gastos_var} setGastosVar={setGastosVar}/>
       case "horarios":  return <PageHorarios   horarios={horarios} setHorarios={setHorarios} config={config}/>
-      case "asist":     return <PageAsist      asistencias={asistencias} setAsistencias={setAsistencias} clientes={clientes}/>
+      case "asist":     return <PageAsist      asistencias={asistencias} setAsistencias={setAsistencias} clientes={clientes} setClientes={setClientes} planes={planes}/>
       case "inv":       return <PageInventario inventario={inventario} setInventario={setInventario}/>
       case "rrhh":      return <PageRRHH       rrhh={rrhh} setRRHH={setRRHH}/>
       case "kpis":      return <PageKPIs       clientes={clientes} ingresos={ingresos} gastos_fijos={gastos_fijos} gastos_var={gastos_var} rrhh={rrhh} config={config}/>
