@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react"
-import { useStore }    from "./hooks/useStore.js"
+import { useState, useEffect, useRef } from "react"
+import { useStore } from "./hooks/useStore.js"
 import { Toast, toast } from "./hooks/useToast.js"
 import { exportExcel } from "./utils/exportExcel.js"
 import { KEYS, DEFAULT_CONFIG, DEFAULT_PROY, HORARIOS_INIT } from "./data/defaults.js"
+import { supabase } from "./utils/supabase.js"
 
 // Pages
 import PageDash        from "./pages/PageDash.jsx"
 import PageClientes    from "./pages/PageClientes.jsx"
 import PageIngresos    from "./pages/PageIngresos.jsx"
 import PageGastos      from "./pages/PageGastos.jsx"
-import PageAsist       from "./pages/PageAsist.jsx"
+import PageAsist        from "./pages/PageAsist.jsx"
 import PageHorarios    from "./pages/PageHorarios.jsx"
 import PageInventario from "./pages/PageInventario.jsx"
 import PageRRHH        from "./pages/PageRRHH.jsx"
@@ -42,8 +43,6 @@ export default function App() {
   const [config,      setConfig]      = useStore(KEYS.config,       DEFAULT_CONFIG)
   const [proy,        setProy]        = useStore(KEYS.proy,         DEFAULT_PROY)
   
-  
- // Nuevo estado persistente para los Planes de SKOL con carga inicial automática
   const [planes,      setPlanes]      = useStore("skol_planes", [
     { id: "p8",  nombre: "Pack 8 (2x)",  clases: 8,  p1: 32000, p2: 35000, p3: 38000, activo: true },
     { id: "p12", nombre: "Pack 12 (3x)", clases: 12, p1: 35000, p2: 38000, p3: 41000, activo: true },
@@ -55,19 +54,156 @@ export default function App() {
 
   // ── UI state ─────────────────────────────────────────────────────
   const [page,       setPage]       = useState("dash")
-  const [saveStatus, setSaveStatus] = useState("💾 Listo")
+  const [saveStatus, setSaveStatus] = useState("⏳ Iniciando...")
+  
+  const cargadoRef = useRef(false)
+
+  // ── 1. Carga Inicial Inteligente ──────────────────────────────────
+  useEffect(() => {
+    async function inicializarSincronizacion() {
+      try {
+        setSaveStatus("⏳ Sincronizando...")
+        
+        // --- CLIENTES ---
+        const { data: cData } = await supabase.from('clientes').select('*')
+        if (cData && cData.length > 0) {
+          setClientes(cData)
+        } else if (clientes.length > 0) {
+          // Si la nube está vacía pero localmente hay datos, los inyectamos de entrada
+          await supabase.from('clientes').upsert(clientes)
+        }
+
+        // --- INGRESOS ---
+        const { data: iData } = await supabase.from('ingresos').select('*')
+        if (iData && iData.length > 0) {
+          setIngresos(iData)
+        } else if (ingresos.length > 0) {
+          await supabase.from('ingresos').upsert(ingresos)
+        }
+
+        // --- GASTOS FIJOS ---
+        const { data: gfData } = await supabase.from('gastos_fijos').select('*')
+        if (gfData && gfData.length > 0) {
+          setGastosFijos(gfData)
+        } else if (gastos_fijos.length > 0) {
+          await supabase.from('gastos_fijos').upsert(gastos_fijos)
+        }
+
+        // --- GASTOS VARIABLES ---
+        const { data: gvData } = await supabase.from('gastos_var').select('*')
+        if (gvData && gvData.length > 0) {
+          setGastosVar(gvData)
+        } else if (gastos_var.length > 0) {
+          await supabase.from('gastos_var').upsert(gastos_var)
+        }
+
+        setSaveStatus("🟢 Al día")
+        cargadoRef.current = true
+      } catch (error) {
+        console.error("Error inicializando SKOL:", error)
+        setSaveStatus("⚠️ Error Sinc")
+        cargadoRef.current = true
+      }
+    }
+    inicializarSincronizacion()
+  }, [])
+
+  // ── 2. RASTREADOR AUTOMÁTICO DE CAMBIOS FUTUROS ──────────────────
+  
+  useEffect(() => {
+    if (!cargadoRef.current) return
+    
+    async function syncClientes() {
+      try {
+        setSaveStatus("⏳ Subiendo...")
+        
+        // Enviamos el lote e interceptamos cualquier problema real
+        const { data, error } = await supabase.from('clientes').upsert(clientes)
+        
+        if (error) {
+          console.error("🔴 ERROR DE SUPABASE DETECTADO:", error)
+          alert("Supabase rechazó el guardado: " + error.message)
+          setSaveStatus("⚠️ Error Guardado")
+          return
+        }
+        
+        setSaveStatus("🟢 Al día")
+      } catch (e) { 
+        console.error("🔴 Error crítico en la función:", e)
+        setSaveStatus("⚠️ Error Guardado") 
+      }
+    }
+    syncClientes()
+  }, [clientes])
+
+ useEffect(() => {
+    if (!cargadoRef.current) return
+    async function syncIngresos() {
+      try {
+        setSaveStatus("⏳ Subiendo...")
+        
+        // Enviamos el lote de caja e interceptamos el error real
+        const { data, error } = await supabase.from('ingresos').upsert(ingresos)
+        
+        if (error) {
+          console.error("🔴 ERROR EN CAJA DETECTADO:", error)
+          alert("Supabase rechazó la Caja: " + error.message)
+          setSaveStatus("⚠️ Error Guardado")
+          return
+        }
+        
+        setSaveStatus("🟢 Al día")
+      } catch (e) { 
+        console.error("🔴 Error crítico en caja:", e)
+        setSaveStatus("⚠️ Error Guardado")
+      }
+    }
+    syncIngresos()
+  }, [ingresos])
+  useEffect(() => {
+    if (!cargadoRef.current) return
+    async function syncFijos() {
+      try {
+        setSaveStatus("⏳ Subiendo...")
+        const { data: DBData } = await supabase.from('gastos_fijos').select('id')
+        if (DBData) {
+          const eliminados = DBData.filter(db => !gastos_fijos.some(loc => loc.id === db.id))
+          for (const el of eliminados) {
+            await supabase.from('gastos_fijos').delete().eq('id', el.id)
+          }
+        }
+        if (gastos_fijos.length > 0) {
+          await supabase.from('gastos_fijos').upsert(gastos_fijos)
+        }
+        setSaveStatus("🟢 Al día")
+      } catch (e) { console.error(e) }
+    }
+    syncFijos()
+  }, [gastos_fijos])
 
   useEffect(() => {
-    setSaveStatus("⏳ Guardando...")
-    const t = setTimeout(() => setSaveStatus("✅ Guardado"), 600)
-    return () => clearTimeout(t)
-  }, [clientes, ingresos, gastos_fijos, gastos_var, inventario, rrhh, asistencias, horarios, config, proy, planes])
+    if (!cargadoRef.current) return
+    async function syncVariables() {
+      try {
+        setSaveStatus("⏳ Subiendo...")
+        const { data: DBData } = await supabase.from('gastos_var').select('id')
+        if (DBData) {
+          const eliminados = DBData.filter(db => !gastos_var.some(loc => loc.id === db.id))
+          for (const el of eliminados) {
+            await supabase.from('gastos_var').delete().eq('id', el.id)
+          }
+        }
+        if (gastos_var.length > 0) {
+          await supabase.from('gastos_var').upsert(gastos_var)
+        }
+        setSaveStatus("🟢 Al día")
+      } catch (e) { console.error(e) }
+    }
+    syncVariables()
+  }, [gastos_var])
 
   const nav = pg => setPage(pg)
-
-  // ── All props bundled for pages that need them ──────────────────
   const allData = { clientes, ingresos, gastos_fijos, gastos_var, inventario, rrhh, asistencias, horarios, config, proy, planes }
-  const allSetters = { setClientes, setIngresos, setGastosFijos, setGastosVar, setInventario, setRRHH, setAsistencias, setHorarios, setConfig, setProy, setPlanes }
 
   const renderPage = () => {
     switch (page) {
@@ -106,7 +242,7 @@ export default function App() {
           GIM<span style={{color:"#ff5722"}}>APP</span>
         </div>
         <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <div style={{ fontSize:11, color:"#3e4658", background:"#1c2130", border:"1px solid #252d3d", borderRadius:8, padding:"5px 10px" }}>
+          <div style={{ fontSize:11, color:"#4cd137", background:"rgba(76, 209, 55, 0.05)", border:"1px solid rgba(76, 209, 55, 0.15)", borderRadius:8, padding:"5px 10px" }}>
             {saveStatus}
           </div>
           <button
